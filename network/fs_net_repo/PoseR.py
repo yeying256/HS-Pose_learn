@@ -38,7 +38,9 @@ class Rot_green(nn.Module):
         x = self.drop1(x)
         x = self.conv4(x)
 
+        # 移除张量x在第三个维度（索引为2）上的单位维度
         x = x.squeeze(2)
+        # x.contiguous()确保张量 x 的数据是连续存储在内存中的。
         x = x.contiguous()
 
         return x

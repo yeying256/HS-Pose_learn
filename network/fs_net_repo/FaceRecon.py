@@ -65,12 +65,15 @@ class FaceRecon(nn.Module):
                 nn.Conv1d(FLAGS.feat_face + 3, 512, 1),
                 nn.BatchNorm1d(512),
                 nn.ReLU(inplace=True),
+                
                 nn.Conv1d(512, 256, 1),
                 nn.BatchNorm1d(256),
                 nn.ReLU(inplace=True),
+
                 nn.Conv1d(256, 128, 1),
                 nn.BatchNorm1d(128),
                 nn.ReLU(inplace=True),
+                
                 nn.Conv1d(128, self.face_recon_num, 1),  # Relu or not?
             )
 

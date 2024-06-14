@@ -15,25 +15,50 @@ from losses.fs_net_loss import FLAGS
 
 def get_neighbor_index(vertices: "(bs, vertice_num, 3)", neighbor_num: int):
     """
+    这段代码定义了一个名为 get_neighbor_index 的函数，其目的是为了计算每个顶点（点云中的点）的最近邻顶点索引。
+    这是点云处理和图形神经网络（GNNs）中常见的预处理步骤，特别是在构建点云的邻接结构时。
     Return: (bs, vertice_num, neighbor_num)
     """
+    # 计算每两个点之间的点积 计算所有点之间的距离
     inner = torch.bmm(vertices, vertices.transpose(1, 2))  # (bs, v, v)
+
+    # 计算每个定点的坐标平方 
     quadratic = torch.sum(vertices ** 2, dim=2)  # (bs, v)
+    
+    # quadratic.unsqueeze(1)： (bs, 1, vertice_num)
+    # quadratic.unsqueeze(2)： (bs, vertice_num, 1)
+    # 利用了python的广播机制
     distance = inner * (-2) + quadratic.unsqueeze(1) + quadratic.unsqueeze(2)
+
+    # 用于查找沿着指定维度的 k 个最大或最小元素。在这个情况下，我们关注的是最小元素，因为我们正在寻找距离最短的邻居。
+    # k为返回多少个元素。加一代表加上自身，然后去掉，dim=-1沿着最后一个维度。
+    # largest=False: 这个参数决定了 topk 是否应该查找最大的 k 个值。设置为false就是找最小值
+    # torch.topk() 返回一个元组，其中第一个元素是 k 个最小值（或最大值，取决于 largest 参数）
+    # 第二个元素是这些值对应的原始张量中的索引。通过 [1]，我们选择了第二个元素，即索引。
     neighbor_index = torch.topk(distance, k=neighbor_num + 1, dim=-1, largest=False)[1]
+    # neighbor_index 将是一个形状为 (bs, vertice_num, neighbor_num + 1) 的张量
+    # 去掉每一个数据的第一个数据。
     neighbor_index = neighbor_index[:, :, 1:]
     return neighbor_index
 
-
+# 两组点云找最近的点的index
 def get_nearest_index(target: "(bs, v1, 3)", source: "(bs, v2, 3)"):
     """
+    target是要找的目标点，source是要从source中的每个点取出一个离target最近的点的索引。
+    也就是说，最终返回的索引是source的索引。每一行都代表离着target每一个点最近的source的点的索引。
     Return: (bs, v1, 1)
     """
+    # ab
     inner = torch.bmm(target, source.transpose(1, 2))  # (bs, v1, v2)
-    s_norm_2 = torch.sum(source ** 2, dim=2)  # (bs, v2)
+    s_norm_2 = torch.sum(source ** 2, dim=2)  # (bs, v2) 
     t_norm_2 = torch.sum(target ** 2, dim=2)  # (bs, v1)
+    # 计算距离
     d_norm_2 = s_norm_2.unsqueeze(1) + t_norm_2.unsqueeze(2) - 2 * inner
+    # k只找一个点，dim 是从最后一个维度开始找 
+    # torch.topk() 返回一个元组，其中第一个元素是 k 个最小值（或最大值，取决于 largest 参数）
+    # 第二个元素是这些值对应的原始张量中的索引。通过 [1]，我们选择了第二个元素，即索引。
     nearest_index = torch.topk(d_norm_2, k=1, dim=-1, largest=False)[1]
+    
     return nearest_index
 
 
@@ -42,7 +67,8 @@ def indexing_neighbor_new(tensor: "(bs, vertice_num, dim)", index: "(bs, vertice
 
     Args:
         tensor (bs, vertice_num, dim): 输入张量
-        index (bs, vertice_num, neighbor_num): _description_
+        index (bs, vertice_num, neighbor_num): _description_  形状为 (bs, vertice_num, neighbor_num) 的张量，存储了每个顶点的邻居顶点索引。
+        其中，邻居点的索引就是对这一个点周围最近的neighbor_num个点的索引（不包括自己）
 
     Returns:
         _type_: _description_ 按照原始的批次、顶点和邻域结构排列，每个顶点的邻域特征已经被正确地抽取出来了。
@@ -61,6 +87,7 @@ def indexing_neighbor_new(tensor: "(bs, vertice_num, dim)", index: "(bs, vertice
 
 def get_neighbor_direction_norm(vertices: "(bs, vertice_num, 3)", neighbor_index: "(bs, vertice_num, neighbor_num)", return_unnormed = False):
     """
+    计算每个顶点与其邻居顶点之间的方向向量，并对其进行归一化。
     Return: (bs, vertice_num, neighobr_num, 3)
     """
     neighbors = indexing_neighbor_new(vertices, neighbor_index)  # (bs, v, n, 3)
@@ -74,6 +101,7 @@ def get_neighbor_direction_norm(vertices: "(bs, vertice_num, 3)", neighbor_index
 class HSlayer_surface(nn.Module):
     """Extract structure feafure from surface, independent from vertice coordinates"""
 
+# 128,gcn_sup_num
     def __init__(self, kernel_num, support_num):
         super().__init__()
         self.feat_k = 8
@@ -86,7 +114,10 @@ class HSlayer_surface(nn.Module):
         self.initialize()
 
     def initialize(self):
+        # ？？？？？？？
         stdv = 1. / math.sqrt(self.support_num * self.kernel_num)
+
+        # -stdv 和 stdv 分别表示均匀分布的最小值和最大值。这意味着 self.directions 中的每个元素都会被一个从 -stdv 到 stdv 范围内的随机数替换。
         self.directions.data.uniform_(-stdv, stdv)
 
     def forward(self,
@@ -95,6 +126,8 @@ class HSlayer_surface(nn.Module):
         """
         Return vertices with local feature: (bs, vertice_num, kernel_num)
         """
+
+        # -1和-2表示交换倒数第一个维度和倒数第二个维度
         f_STE = self.STE_layer(vertices.transpose(-1,-2)).transpose(-1,-2).contiguous()
         receptive_fields_norm, _ = get_receptive_fields(neighbor_num, vertices, mode='RF-P')
         feature = self.graph_conv(receptive_fields_norm, vertices, neighbor_num)
@@ -110,9 +143,15 @@ class HSlayer_surface(nn.Module):
         Return (bs, vertice_num, kernel_num): the extracted feature.
         """
         bs, vertice_num, _ = vertices.size()
+
+
+        # 是为了计算接收域（receptive fields）与支持方向（support directions）之间的关系，这在诸如图神经网络（GNNs）或点云处理等高级深度学习模型中很常见。
+        # 取范数
         support_direction_norm = F.normalize(self.directions, dim=0)  # (3, s * k)
+        # 这是在干什么？
         theta = receptive_fields_norm @ support_direction_norm  # (bs, vertice_num, neighbor_num, s*k)
 
+        # 激活函数
         theta = self.relu(theta)
         theta = theta.reshape(bs, vertice_num, neighbor_num, self.support_num, self.kernel_num)
         theta = torch.max(theta, dim=2)[0]  # (bs, vertice_num, support_num, kernel_num)
@@ -148,6 +187,8 @@ class HS_layer(nn.Module):
         self.initialize()
 
     def initialize(self):
+
+        # 这些也看不太明白  ？？？？
         stdv = 1. / math.sqrt(self.out_channel * (self.support_num + 1))
         self.weights.data.uniform_(-stdv, stdv)
         self.bias.data.uniform_(-stdv, stdv)
@@ -175,6 +216,9 @@ class HS_layer(nn.Module):
 
         Return (bs, vertice_num, kernel_num): the extracted feature.
         """
+
+
+        # ？？？？？
         bs, vertice_num, _ = vertices.size()
         support_direction_norm = F.normalize(self.directions, dim=0)
         theta = receptive_fields_norm @ support_direction_norm  # (bs, vertice_num, neighbor_num, support_num * out_channel)
@@ -191,6 +235,8 @@ class HS_layer(nn.Module):
         activation_support = torch.max(activation_support, dim=2)[0]  # (bs, vertice_num, support_num, out_channel)
         activation_support = torch.mean(activation_support, dim=2)  # (bs, vertice_num, out_channel)
         feature = feature_center + activation_support  # (bs, vertice_num, out_channel)
+
+        # ？？？？？
         return feature
 
     def ORL_forward(self, feature_fuse, vertices, neighbor_num):
@@ -231,13 +277,16 @@ def get_ORL_global(feature:'(bs, vertice_num, in_channel)', vertices: '(bs, vert
     return f_global
 
 class Pool_layer(nn.Module):
+    # 点云数据的池化操作 
     def __init__(self, pooling_rate: int = 4, neighbor_num: int = 4):
         super().__init__()
-        self.pooling_rate = pooling_rate
+        # 指定顶点数量减少的比例pooling_rate
+        self.pooling_rate = pooling_rate 
+        #  指定用于池化计算的邻居顶点数量
         self.neighbor_num = neighbor_num
 
     def forward(self,
-                vertices: "(bs, vertice_num, 3)",
+                vertices: "(bs, vertice_num, 3)", 
                 feature_map: "(bs, vertice_num, channel_num)"):
         """
         Return:
@@ -252,6 +301,7 @@ class Pool_layer(nn.Module):
                                              neighbor_index)  # (bs, vertice_num, neighbor_num, channel_num)
         pooled_feature = torch.max(neighbor_feature, dim=2)[0]  # (bs, vertice_num, channel_num)
 
+        # 压缩率 压缩到多少
         pool_num = int(vertice_num / self.pooling_rate)
         sample_idx = torch.randperm(vertice_num)[:pool_num]
         vertices_pool = vertices[:, sample_idx, :]  # (bs, pool_num, 3)

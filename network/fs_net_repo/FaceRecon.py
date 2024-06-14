@@ -41,6 +41,7 @@ class FaceRecon(nn.Module):
 
         if FLAGS.train:
             # Sequential 按顺序堆叠了一系列的层
+            # 这一部分代表了紫色的 symmetry-Aware Reconstruction 的上半部分
             self.conv1d_block = nn.Sequential(
                 nn.Conv1d(dim_fuse, 512, 1), # 第一层卷积，输入通道数为dim_fuse，输出通道数为512，卷积核大小为1
                 nn.BatchNorm1d(512),# 批归一化层，作用于512个特征通道
@@ -54,6 +55,7 @@ class FaceRecon(nn.Module):
             )
 
             # 重建头
+            # 这一部分代表了紫色的 symmetry-Aware Reconstruction 的下半部分
             self.recon_head = nn.Sequential(
                 nn.Conv1d(256, 128, 1),
                 nn.BatchNorm1d(128),
@@ -61,6 +63,7 @@ class FaceRecon(nn.Module):
                 nn.Conv1d(128, self.recon_num, 1),
             )
 
+            # 这一部分代表了黄色部分 Bounding-box Voting
             self.face_head = nn.Sequential(
                 nn.Conv1d(FLAGS.feat_face + 3, 512, 1),
                 nn.BatchNorm1d(512),

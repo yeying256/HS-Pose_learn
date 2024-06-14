@@ -74,14 +74,19 @@ def indexing_neighbor_new(tensor: "(bs, vertice_num, dim)", index: "(bs, vertice
         _type_: _description_ 按照原始的批次、顶点和邻域结构排列，每个顶点的邻域特征已经被正确地抽取出来了。
     """
     bs, num_points, num_dims = tensor.size()
-    # arange：等差数列
+    # arange：等差数列,因为要加上批次
     idx_base = torch.arange(0, bs, device=tensor.device).view(-1, 1, 1) * num_points
+
+    # 要加上批次，第一个批次的数根据广播机制都加0,第二个批次的数都加上每个批次的点云个数。
     idx = index + idx_base 
+    # 将这个多维张量转化为一维张量。
     idx = idx.view(-1)
+
+    # 先把tensor展成了一个长条形的矩阵，每一行代表一个点的三个坐标，然后抽取第idx行组成一个新的矩阵。
     feature = tensor.reshape(bs * num_points, -1)[idx, :]
     _, out_num_points, n = index.size()
 
-    # view改变形状不改变数据 
+    # view改变形状不改变数据 num_dims是三维，n是邻域点的数目，out_num_points是每个点
     feature = feature.view(bs, out_num_points, n, num_dims)
     return feature
 
@@ -164,7 +169,7 @@ class HSlayer_surface(nn.Module):
         feature = self.conv2(feat.transpose(-1,-2)).transpose(-1,-2).contiguous() + feature
         return feature
 
-    
+# 这一部分代表了图中左上角的部分
 class HS_layer(nn.Module):
     def __init__(self, in_channel, out_channel, support_num):
         super().__init__()
@@ -303,6 +308,7 @@ class Pool_layer(nn.Module):
 
         # 压缩率 压缩到多少
         pool_num = int(vertice_num / self.pooling_rate)
+        # torch.randperm(vertice_num) 是生成一个vertice_num个元素的张量，里面的数据无序排列，都是从0到vertice_num-1的随机数。
         sample_idx = torch.randperm(vertice_num)[:pool_num]
         vertices_pool = vertices[:, sample_idx, :]  # (bs, pool_num, 3)
         feature_map_pool = pooled_feature[:, sample_idx, :]  # (bs, pool_num, channel_num)

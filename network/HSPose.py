@@ -24,8 +24,10 @@ class HSPose(nn.Module):
     def __init__(self, train_stage):
         # 继承自nn.Module时使用的一种做法。
         super(HSPose, self).__init__()
+        # 网络结构
         self.posenet = PoseNet9D()
         self.train_stage = train_stage
+        # 剩下的都是损失函数的计算
         self.loss_recon = recon_6face_loss()
         self.loss_fs_net = fs_net_loss()
         self.loss_geo = geo_transform_loss()

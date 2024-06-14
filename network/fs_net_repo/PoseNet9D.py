@@ -18,9 +18,15 @@ class PoseNet9D(nn.Module):
         super(PoseNet9D, self).__init__()
         # Used the fsnet rot_green and rot_red directly
         # 直接利用了“fsnet”工具包或模型中已经实现好的“rot_green”和“rot_red”功能，提高了开发效率或利用了已优化的算法实现。
+        
+        # 这两个网络对应了图中的 pose and size Estimation中的计算R的部分
         self.rot_green = Rot_green() 
         self.rot_red = Rot_red()
+
+        # 这一个网络代表了 HS-encoder
         self.face_recon = FaceRecon()
+        
+        # 这一个网络对应了图pose and size Estimation中的计算 t，S
         self.ts = Pose_Ts()
 
     def forward(self, points, obj_id):

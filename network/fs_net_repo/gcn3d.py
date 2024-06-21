@@ -116,8 +116,10 @@ class HSlayer_surface(nn.Module):
         super().__init__()
         self.feat_k = 8
         self.kernel_num = kernel_num
+        # 支持方向数量 support_num 是3
         self.support_num = support_num
         self.relu = nn.ReLU(inplace=True)
+        # 这是一个可以学习的参数。
         self.directions = nn.Parameter(torch.FloatTensor(3, support_num * kernel_num))
         self.STE_layer = nn.Conv1d(3, kernel_num, kernel_size=1, bias=False)
         self.conv2 = nn.Conv1d(2*kernel_num, kernel_num, kernel_size=1, bias=False)
@@ -139,26 +141,29 @@ class HSlayer_surface(nn.Module):
 
         # -1和-2表示交换倒数第一个维度和倒数第二个维度
         f_STE = self.STE_layer(vertices.transpose(-1,-2)).transpose(-1,-2).contiguous()
-        # RF-P是距离的感受野，这里只是算了一下距离感受野的方向向量
+        # RF-P是距离的感受野，这里只是算了一下距离感受野的方向向量 每个点都计算了感受野。(bs, v, n, 3)
         receptive_fields_norm, _ = get_receptive_fields(neighbor_num, vertices, mode='RF-P')
         
+        # 感受野单位向量
         feature = self.graph_conv(receptive_fields_norm, vertices, neighbor_num)
         feature = self.ORL_forward(feature, vertices, neighbor_num)
 
         return feature + f_STE 
     
-    def graph_conv(self, receptive_fields_norm,
+    def graph_conv(self, receptive_fields_norm:"(bs, v, n, 3)",
                    vertices: "(bs, vertice_num, 3)",
                    neighbor_num: 'int',):
         """ 3D graph convolution using receptive fields. More details please check 3D-GCN: https://github.com/zhihao-lin/3dgcn
-
+        receptive_fields_norm ：感受野（是一群单位向量构成的矩阵）
+        vertices：所有的点云
+        neighbor_num 感受野所有的邻居点
         Return (bs, vertice_num, kernel_num): the extracted feature.
         """
         bs, vertice_num, _ = vertices.size()
 
 
         # 是为了计算接收域（receptive fields）与支持方向（support directions）之间的关系，这在诸如图神经网络（GNNs）或点云处理等高级深度学习模型中很常见。
-        # 取范数
+        # 取了一群无序的单位向量
         support_direction_norm = F.normalize(self.directions, dim=0)  # (3, s * k)
         # 这是在干什么？
         theta = receptive_fields_norm @ support_direction_norm  # (bs, vertice_num, neighbor_num, s*k)
@@ -284,6 +289,7 @@ def get_receptive_fields(neighbor_num: "int",
     neighbor_index = get_neighbor_index(feat, neighbor_num)
     # 获取每个点的 方向向量，且这些向量是单位向量   
     neighbor_direction_norm = get_neighbor_direction_norm(vertices, neighbor_index)
+    # (bs, v, n, 3)
     return neighbor_direction_norm, neighbor_index
 
 def get_ORL_global(feature:'(bs, vertice_num, in_channel)', vertices: '(bs, vertice_num, 3)', 

@@ -142,8 +142,8 @@ class PoseDataset(data.Dataset):
             self.mug_meta = cPickle.load(f)
 
         self.camera_intrinsics = np.array([[577.5, 0, 319.5], [0, 577.5, 239.5], [0, 0, 1]],
-                                          dtype=np.float)  # [fx, fy, cx, cy]
-        self.real_intrinsics = np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]], dtype=np.float)
+                                          dtype=float)  # [fx, fy, cx, cy]
+        self.real_intrinsics = np.array([[591.0125, 0, 322.525], [0, 590.16775, 244.11084], [0, 0, 1]], dtype=float)
 
         self.invaild_list = []
         self.mug_sym = mmcv.load(os.path.join(self.data_dir, 'Real/train/mug_handle.pkl'))
@@ -235,7 +235,7 @@ class PoseDataset(data.Dataset):
             coord_2d, bbox_center, scale, FLAGS.img_size, interpolation=cv2.INTER_NEAREST
         ).transpose(2, 0, 1)
 
-        mask_target = mask.copy().astype(np.float)
+        mask_target = mask.copy().astype(float)
         mask_target[mask != inst_id] = 0.0
         mask_target[mask == inst_id] = 1.0
 
@@ -253,7 +253,7 @@ class PoseDataset(data.Dataset):
         depth_valid = roi_depth > 0
         if np.sum(depth_valid) <= 1.0:
             return self.__getitem__((index + 1) % self.__len__())
-        roi_m_d_valid = roi_mask.astype(np.bool) * depth_valid
+        roi_m_d_valid = roi_mask.astype(bool) * depth_valid
         if np.sum(roi_m_d_valid) <= 1.0:
             return self.__getitem__((index + 1) % self.__len__())
 
@@ -322,7 +322,7 @@ class PoseDataset(data.Dataset):
     def _depth_to_pcl(self, depth, K, xymap, mask):
         K = K.reshape(-1)
         cx, cy, fx, fy = K[2], K[5], K[0], K[4]
-        depth = depth.reshape(-1).astype(np.float)
+        depth = depth.reshape(-1).astype(float)
         valid = ((depth > 0) * mask.reshape(-1)) > 0
         depth = depth[valid]
         x_map = xymap[0].reshape(-1)[valid]
@@ -419,19 +419,19 @@ class PoseDataset(data.Dataset):
         #
         # for specific defination, see sketch_loss
         if c == 'bottle':
-            sym = np.array([1, 1, 0, 1], dtype=np.int)
+            sym = np.array([1, 1, 0, 1], dtype=int)
         elif c == 'bowl':
-            sym = np.array([1, 1, 0, 1], dtype=np.int)
+            sym = np.array([1, 1, 0, 1], dtype=int)
         elif c == 'camera':
-            sym = np.array([0, 0, 0, 0], dtype=np.int)
+            sym = np.array([0, 0, 0, 0], dtype=int)
         elif c == 'can':
-            sym = np.array([1, 1, 1, 1], dtype=np.int)
+            sym = np.array([1, 1, 1, 1], dtype=int)
         elif c == 'laptop':
-            sym = np.array([0, 1, 0, 0], dtype=np.int)
+            sym = np.array([0, 1, 0, 0], dtype=int)
         elif c == 'mug' and mug_handle == 1:
-            sym = np.array([0, 1, 0, 0], dtype=np.int)  # for mug, we currently mark it as no symmetry
+            sym = np.array([0, 1, 0, 0], dtype=int)  # for mug, we currently mark it as no symmetry
         elif c == 'mug' and mug_handle == 0:
-            sym = np.array([1, 0, 0, 0], dtype=np.int)
+            sym = np.array([1, 0, 0, 0], dtype=int)
         else:
-            sym = np.array([0, 0, 0, 0], dtype=np.int)
+            sym = np.array([0, 0, 0, 0], dtype=int)
         return sym

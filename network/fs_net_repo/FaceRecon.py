@@ -127,7 +127,10 @@ class FaceRecon(nn.Module):
                                            min(self.neighbor_num, v_pool_1.shape[1] // 8)).transpose(1, 2)).transpose(1, 2), inplace=True)
         fm_3 = F.relu(self.bn3(self.conv_3(v_pool_1, fm_2, 
                                            min(self.neighbor_num, v_pool_1.shape[1] // 8)).transpose(1, 2)).transpose(1, 2), inplace=True)
+        # 第二次池化
         v_pool_2, fm_pool_2 = self.pool_2(v_pool_1, fm_3)
+        
+
         fm_4 = self.conv_4(v_pool_2, fm_pool_2, min(self.neighbor_num, v_pool_2.shape[1] // 8))
         f_global = fm_4.max(1)[0]  # (bs, f)
 

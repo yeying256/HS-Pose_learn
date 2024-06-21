@@ -48,8 +48,9 @@ def get_nearest_index(target: "(bs, v1, 3)", source: "(bs, v2, 3)"):
     也就是说，最终返回的索引是source的索引。每一行都代表离着target每一个点最近的source的点的索引。
     Return: (bs, v1, 1)
     """
-    # ab
+    # 执行批量矩阵乘法
     inner = torch.bmm(target, source.transpose(1, 2))  # (bs, v1, v2)
+    
     s_norm_2 = torch.sum(source ** 2, dim=2)  # (bs, v2) 
     t_norm_2 = torch.sum(target ** 2, dim=2)  # (bs, v1)
     # 计算距离
@@ -94,9 +95,13 @@ def get_neighbor_direction_norm(vertices: "(bs, vertice_num, 3)", neighbor_index
     """
     计算每个顶点与其邻居顶点之间的方向向量，并对其进行归一化。
     Return: (bs, vertice_num, neighobr_num, 3)
+    此函数返回了每个点的
     """
     neighbors = indexing_neighbor_new(vertices, neighbor_index)  # (bs, v, n, 3)
+    # vertices.unsqueeze(2)是在索引为2的位置增加一个新的维度，这样才能做广播减法，而后获得了方向向量。
     neighbor_direction = neighbors - vertices.unsqueeze(2)
+
+    # 将每一个向量转化为单位方向向量
     neighbor_direction_norm = F.normalize(neighbor_direction, dim=-1)
     if return_unnormed:
         return neighbor_direction_norm.float(), neighbor_direction
@@ -134,7 +139,9 @@ class HSlayer_surface(nn.Module):
 
         # -1和-2表示交换倒数第一个维度和倒数第二个维度
         f_STE = self.STE_layer(vertices.transpose(-1,-2)).transpose(-1,-2).contiguous()
+        # RF-P是距离的感受野，这里只是算了一下距离感受野的方向向量
         receptive_fields_norm, _ = get_receptive_fields(neighbor_num, vertices, mode='RF-P')
+        
         feature = self.graph_conv(receptive_fields_norm, vertices, neighbor_num)
         feature = self.ORL_forward(feature, vertices, neighbor_num)
 
@@ -199,6 +206,7 @@ class HS_layer(nn.Module):
         self.bias.data.uniform_(-stdv, stdv)
         self.directions.data.uniform_(-stdv, stdv)
 
+    # 输入的点云
     def forward(self, vertices: "(bs, vertice_num, 3)",
                 feature_map: "(bs, vertice_num, in_channel)",
                 neighbor_num: "int"):
@@ -218,8 +226,9 @@ class HS_layer(nn.Module):
                    vertices: "(bs, vertice_num, 3)",
                    neighbor_num: 'int',):
         """ 3D graph convolution using receptive fields. More details please check 3D-GCN: https://github.com/zhihao-lin/3dgcn
-
+        
         Return (bs, vertice_num, kernel_num): the extracted feature.
+        图卷积神经网络
         """
 
 
@@ -260,15 +269,20 @@ def get_receptive_fields(neighbor_num: "int",
         neighbor_num (int): neighbor number.
         vertices (tensor): The 3D point cloud for forming receptive fields 
         feature_map (tensor, optional): The features for finding neighbors and should be provided if 'RF-F' is used. Defaults to None. 
-        mode (str, optional): The metrics for finding the neighbors. Should only use 'RF-F' or 'RF-P'. 'RF-F' means forming the receptive fields using feature-distance, and 'RF-P' means using point-distance. Defaults to 'RF-F'.
+        mode (str, optional): The metrics for finding the neighbors. 
+        Should only use 'RF-F' or 'RF-P'. 'RF-F' means forming the receptive fields using feature-distance, RF-F特征感受野
+        and 'RF-P' means using point-distance. Defaults to 'RF-F'.距离感受野
     """
     assert mode in ['RF-F', 'RF-P']
     if mode == 'RF-F':
         assert feature_map is not None, "The feature_map should be provided if 'RF-F' is used"
         feat = feature_map
     else:
+        # 距离感受野只是把点云传入进去
         feat = vertices
+    # 获得每个点云的邻居节点的index 
     neighbor_index = get_neighbor_index(feat, neighbor_num)
+    # 获取每个点的 方向向量，且这些向量是单位向量   
     neighbor_direction_norm = get_neighbor_direction_norm(vertices, neighbor_index)
     return neighbor_direction_norm, neighbor_index
 

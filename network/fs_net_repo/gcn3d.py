@@ -50,7 +50,7 @@ def get_nearest_index(target: "(bs, v1, 3)", source: "(bs, v2, 3)"):
     """
     # 执行批量矩阵乘法
     inner = torch.bmm(target, source.transpose(1, 2))  # (bs, v1, v2)
-    
+
     s_norm_2 = torch.sum(source ** 2, dim=2)  # (bs, v2) 
     t_norm_2 = torch.sum(target ** 2, dim=2)  # (bs, v1)
     # 计算距离
@@ -314,10 +314,12 @@ class Pool_layer(nn.Module):
         """
         bs, vertice_num, _ = vertices.size()
 
+        # 这是个索引
         neighbor_index = get_neighbor_index(vertices, self.neighbor_num)
-
+        # 从feature_map中 返回所有的邻居点特征，neighbor_feature为 bs：批量，vertice_num是每个点，neighbor_num是每个点的邻居点数目，channel_num是3，
         neighbor_feature = indexing_neighbor_new(feature_map,
                                              neighbor_index)  # (bs, vertice_num, neighbor_num, channel_num)
+        # 找每个点最近的那个点的特征。[0]是为了返回最大值，二1十返回最大值所在的索引。
         pooled_feature = torch.max(neighbor_feature, dim=2)[0]  # (bs, vertice_num, channel_num)
 
         # 压缩率 压缩到多少

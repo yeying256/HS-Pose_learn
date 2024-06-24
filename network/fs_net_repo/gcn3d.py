@@ -315,8 +315,8 @@ class Pool_layer(nn.Module):
                 feature_map: "(bs, vertice_num, channel_num)"):
         """
         Return:
-            vertices_pool: (bs, pool_vertice_num, 3),
-            feature_map_pool: (bs, pool_vertice_num, channel_num)
+            vertices_pool: (bs, pool_vertice_num, 3),第一个返回参数是直接池化
+            feature_map_pool: (bs, pool_vertice_num, channel_num) 第二个返回参数是 
         """
         bs, vertice_num, _ = vertices.size()
 
@@ -325,13 +325,14 @@ class Pool_layer(nn.Module):
         # 从feature_map中 返回所有的邻居点特征，neighbor_feature为 bs：批量，vertice_num是每个点，neighbor_num是每个点的邻居点数目，channel_num是3，
         neighbor_feature = indexing_neighbor_new(feature_map,
                                              neighbor_index)  # (bs, vertice_num, neighbor_num, channel_num)
-        # 找每个点最近的那个点的特征。[0]是为了返回最大值，二1十返回最大值所在的索引。
+        # 找每个点最近的那个点的特征。[0]是为了返回最大值，2是返回最大值所在的索引。
         pooled_feature = torch.max(neighbor_feature, dim=2)[0]  # (bs, vertice_num, channel_num)
 
         # 压缩率 压缩到多少
         pool_num = int(vertice_num / self.pooling_rate)
         # torch.randperm(vertice_num) 是生成一个vertice_num个元素的张量，里面的数据无序排列，都是从0到vertice_num-1的随机数。
         sample_idx = torch.randperm(vertice_num)[:pool_num]
+        # 池化：随机取一些点云作为池化
         vertices_pool = vertices[:, sample_idx, :]  # (bs, pool_num, 3)
         feature_map_pool = pooled_feature[:, sample_idx, :]  # (bs, pool_num, channel_num)
         return vertices_pool, feature_map_pool

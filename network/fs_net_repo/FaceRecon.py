@@ -134,11 +134,13 @@ class FaceRecon(nn.Module):
         fm_4 = self.conv_4(v_pool_2, fm_pool_2, min(self.neighbor_num, v_pool_2.shape[1] // 8))
         f_global = fm_4.max(1)[0]  # (bs, f)
 
-        # 这个找的是纯距离，把特征点
+        # 这个找的是纯距离，在点集合v_pool_1中找出一个离着vertices的每一个点最近的一个点。这样的点可以找到vertices_num个。
+        # (bs, v1, 1)
         nearest_pool_1 = gcn3d.get_nearest_index(vertices, v_pool_1)
+        # 从v_pool_2中找出。。。。离着每一个vertices元素最近的一个点，构成一个集合。
         nearest_pool_2 = gcn3d.get_nearest_index(vertices, v_pool_2)
 
-        # 这个是从
+        # 这个是从 进入：(bs, v1, 1)
         fm_2 = gcn3d.indexing_neighbor_new(fm_2, nearest_pool_1).squeeze(2)
         fm_3 = gcn3d.indexing_neighbor_new(fm_3, nearest_pool_1).squeeze(2)
         fm_4 = gcn3d.indexing_neighbor_new(fm_4, nearest_pool_2).squeeze(2)
